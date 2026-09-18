@@ -13,7 +13,7 @@ st.caption(
     "Institutional-grade portfolio analytics, crisis stress-testing, and forward wealth simulations."
 )
 
-# Region-Categorized Fund & Benchmark Mapping
+# Region-Categorized Fund & Benchmark Mapping (Using Verified Yahoo Tickers)
 FUNDS_BY_REGION = {
     "US Market": {
         "VFIAX - Vanguard 500 Index Fund": "VFIAX",
@@ -29,11 +29,13 @@ FUNDS_BY_REGION = {
         "Custom Ticker...": "CUSTOM",
     },
     "EMEA Market (Europe, Middle East, Africa)": {
-        "0P00000B2H.L - Fidelity European Growth Fund": "0P00000B2H.L",
-        "0P0000XW01.L - Vanguard LifeStrategy 60% Equity": "0P0000XW01.L",
         "IWDA.L - iShares Core MSCI World UCITS ETF": "IWDA.L",
         "VEUR.L - Vanguard FTSE Developed Europe UCITS ETF": "VEUR.L",
+        "VERX.L - Vanguard FTSE Developed Europe ex-UK UCITS ETF": "VERX.L",
+        "ISF.L - iShares Core FTSE 100 UCITS ETF": "ISF.L",
+        "EXW1.DE - iShares EURO STOXX 50 UCITS ETF": "EXW1.DE",
         "IEAC.L - iShares Core EUR Corporate Bond UCITS ETF": "IEAC.L",
+        "VWRL.L - Vanguard FTSE All-World UCITS ETF": "VWRL.L",
         "Custom Ticker...": "CUSTOM",
     },
     "Global & Emerging Markets": {
@@ -54,11 +56,11 @@ BENCHMARKS_BY_REGION = {
         "Custom Ticker...": "CUSTOM",
     },
     "EMEA Market (Europe, Middle East, Africa)": {
-        "^GDAXI - DAX 40 Index (Germany Blue-Chip)": "^GDAXI",
+        "^STOXX50E - EURO STOXX 50 Index (Eurozone)": "^STOXX50E",
         "^FTSE - FTSE 100 Index (UK)": "^FTSE",
+        "^GDAXI - DAX 40 Index (Germany Blue-Chip)": "^GDAXI",
         "^FCHI - CAC 40 Index (France)": "^FCHI",
         "FTSEMIB.MI - FTSE MIB Index (Italy)": "FTSEMIB.MI",
-        "^STOXX50E - EURO STOXX 50 Index (Eurozone)": "^STOXX50E",
         "Custom Ticker...": "CUSTOM",
     },
     "Global & Emerging Markets": {
@@ -81,7 +83,7 @@ current_funds = FUNDS_BY_REGION[selected_region]
 current_benchmarks = BENCHMARKS_BY_REGION[selected_region]
 
 selected_fund_label = st.sidebar.selectbox(
-    "Select Mutual Fund", list(current_funds.keys())
+    "Select Mutual Fund / ETF", list(current_funds.keys())
 )
 if current_funds[selected_fund_label] == "CUSTOM":
     fund_ticker = (
@@ -118,12 +120,24 @@ sim_years = st.sidebar.slider("Projection Horizon (Years)", 1, 10, 5)
 
 @st.cache_data
 def get_price_series(ticker, start, end):
-    data = yf.download(ticker, start=start, end=end)
-    if data.empty:
+    try:
+        data = yf.download(ticker, start=start, end=end, progress=False)
+        if data.empty:
+            return pd.Series(dtype=float)
+
+        # Handle yfinance multi-index dataframe outputs
+        if isinstance(data.columns, pd.MultiIndex):
+            if "Close" in data.columns.levels[0]:
+                df_close = data["Close"]
+                if ticker in df_close.columns:
+                    return df_close[ticker].dropna()
+                return df_close.iloc[:, 0].dropna()
+
+        if "Close" in data.columns:
+            return data["Close"].dropna()
         return pd.Series(dtype=float)
-    if isinstance(data.columns, pd.MultiIndex):
-        return data["Close"][ticker].dropna()
-    return data["Close"].dropna()
+    except Exception:
+        return pd.Series(dtype=float)
 
 
 try:
@@ -132,21 +146,20 @@ try:
 
     if fund_data.empty or bench_data.empty:
         st.warning(
-            "⚠️ No market data found for the selected ticker combination or date range. Please try expanding the date range or choosing different tickers."
+            "⚠️ No historical market data found for the selected ticker combination. Please verify the ticker or adjust the date range."
         )
         st.stop()
 
     df = pd.DataFrame({"Fund": fund_data, "Benchmark": bench_data}).dropna()
     returns = df.pct_change().dropna()
 
-    # Guard against insufficient overlapping date records
     if len(returns) < 5:
         st.warning(
-            "⚠️ Insufficient overlapping historical trading days found between these two tickers. Please select a broader date range or matching market region."
+            "⚠️ Insufficient overlapping historical trading days found between these two tickers. Please select a broader date range."
         )
         st.stop()
 
-    # Core Calculations with Safeguards against Division by Zero
+    # Core Calculations
     trading_days = 252
     num_records = len(returns)
 
@@ -156,12 +169,10 @@ try:
     fund_vol = returns["Fund"].std() * np.sqrt(trading_days)
     risk_free_rate = 0.04
 
-    # Safeguard Sharpe Ratio
     sharpe_ratio = (
         (fund_cagr - risk_free_rate) / fund_vol if fund_vol > 0 else 0.0
     )
 
-    # Safeguard Beta
     cov_matrix = np.cov(returns["Fund"], returns["Benchmark"])
     bench_variance = cov_matrix[1, 1]
     beta = (cov_matrix[0, 1] / bench_variance) if bench_variance > 0 else 1.0
