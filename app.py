@@ -77,7 +77,6 @@ selected_region = st.sidebar.selectbox(
 
 st.sidebar.header("2. Asset Selection")
 
-# Filtered Dropdowns based on Region Choice
 current_funds = FUNDS_BY_REGION[selected_region]
 current_benchmarks = BENCHMARKS_BY_REGION[selected_region]
 
@@ -120,36 +119,59 @@ sim_years = st.sidebar.slider("Projection Horizon (Years)", 1, 10, 5)
 @st.cache_data
 def get_price_series(ticker, start, end):
     data = yf.download(ticker, start=start, end=end)
+    if data.empty:
+        return pd.Series(dtype=float)
     if isinstance(data.columns, pd.MultiIndex):
-        return data["Close"][ticker]
-    return data["Close"]
+        return data["Close"][ticker].dropna()
+    return data["Close"].dropna()
 
 
 try:
     fund_data = get_price_series(fund_ticker, start_date, end_date)
     bench_data = get_price_series(benchmark_ticker, start_date, end_date)
 
+    if fund_data.empty or bench_data.empty:
+        st.warning(
+            "⚠️ No market data found for the selected ticker combination or date range. Please try expanding the date range or choosing different tickers."
+        )
+        st.stop()
+
     df = pd.DataFrame({"Fund": fund_data, "Benchmark": bench_data}).dropna()
     returns = df.pct_change().dropna()
 
-    # Core Calculations
+    # Guard against insufficient overlapping date records
+    if len(returns) < 5:
+        st.warning(
+            "⚠️ Insufficient overlapping historical trading days found between these two tickers. Please select a broader date range or matching market region."
+        )
+        st.stop()
+
+    # Core Calculations with Safeguards against Division by Zero
     trading_days = 252
+    num_records = len(returns)
+
     fund_cagr = (
-        (1 + returns["Fund"]).prod() ** (trading_days / len(returns))
+        (1 + returns["Fund"]).prod() ** (trading_days / num_records)
     ) - 1
     fund_vol = returns["Fund"].std() * np.sqrt(trading_days)
     risk_free_rate = 0.04
-    sharpe_ratio = (fund_cagr - risk_free_rate) / fund_vol
 
+    # Safeguard Sharpe Ratio
+    sharpe_ratio = (
+        (fund_cagr - risk_free_rate) / fund_vol if fund_vol > 0 else 0.0
+    )
+
+    # Safeguard Beta
     cov_matrix = np.cov(returns["Fund"], returns["Benchmark"])
-    beta = cov_matrix[0, 1] / cov_matrix[1, 1]
+    bench_variance = cov_matrix[1, 1]
+    beta = (cov_matrix[0, 1] / bench_variance) if bench_variance > 0 else 1.0
 
     cumulative = (1 + returns["Fund"]).cumprod()
     peak = cumulative.cummax()
     drawdown = (cumulative - peak) / peak
-    max_drawdown = drawdown.min()
+    max_drawdown = drawdown.min() if not drawdown.empty else 0.0
 
-    # Metrics Display
+    # Display KPI Metrics Cards
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Annualized Return", f"{fund_cagr:.2%}")
     col2.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
@@ -236,7 +258,7 @@ try:
         for name, (c_start, c_end) in crises.items():
             try:
                 c_df = df.loc[c_start:c_end]
-                if not c_df.empty:
+                if not c_df.empty and len(c_df) > 1:
                     f_return = (
                         c_df["Fund"].iloc[-1] / c_df["Fund"].iloc[0]
                     ) - 1
