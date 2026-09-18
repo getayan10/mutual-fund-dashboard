@@ -7,7 +7,7 @@ import yfinance as yf
 st.set_page_config(page_title="Client Wealth Dashboard", layout="wide")
 st.title("💼 Client Investment Performance Summary")
 st.caption(
-    "A clean, plain-English overview of fund performance, returns, and risk exposure."
+    "A clean overview of fund performance, returns, and risk exposure."
 )
 
 # Sidebar Controls
