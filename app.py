@@ -11,49 +11,66 @@ st.caption(
     "Institutional-grade portfolio analytics, crisis stress-testing, and forward wealth simulations."
 )
 
-# Pre-configured Ticker Dictionaries
+# Pre-configured Ticker Dictionaries (20 Mutual Funds & 10 Benchmarks)
 FUND_OPTIONS = {
     "VFIAX - Vanguard 500 Index Fund": "VFIAX",
     "FXAIX - Fidelity 500 Index Fund": "FXAIX",
+    "SWPPX - Schwab S&P 500 Index Fund": "SWPPX",
     "FBGRX - Fidelity Blue Chip Growth": "FBGRX",
-    "AGTHX - American Funds Growth Fund": "AGTHX",
+    "AGTHX - American Funds Growth Fund of America": "AGTHX",
+    "VWUAX - Vanguard U.S. Growth Fund": "VWUAX",
+    "DODGX - Dodge & Cox Stock Fund": "DODGX",
+    "VVIAX - Vanguard Value Index Fund": "VVIAX",
+    "AMRMX - American Funds Washington Mutual": "AMRMX",
     "SGRAX - Allspring Large Cap Core (Wells Fargo)": "SGRAX",
     "EKJAX - Allspring Discovery Growth (Wells Fargo)": "EKJAX",
-    "VBTLX - Vanguard Total Bond Market": "VBTLX",
+    "NVHAX - Allspring Special Small Cap Value (Wells Fargo)": "NVHAX",
+    "WFDAX - Allspring Core Bond Fund (Wells Fargo)": "WFDAX",
+    "VIMAX - Vanguard Mid-Cap Index Fund": "VIMAX",
+    "VSMAX - Vanguard Small-Cap Index Fund": "VSMAX",
+    "VTIAX - Vanguard Total International Stock Index": "VTIAX",
+    "AEPGX - American Funds EuroPacific Growth": "AEPGX",
+    "VBTLX - Vanguard Total Bond Market Index": "VBTLX",
+    "DODIX - Dodge & Cox Income Fund": "DODIX",
     "Custom Ticker...": "CUSTOM",
 }
 
 BENCHMARK_OPTIONS = {
     "^GSPC - S&P 500 Index": "^GSPC",
     "^IXIC - NASDAQ Composite": "^IXIC",
-    "^RUT - Russell 2000 (Small Cap)": "^RUT",
-    "AGG - iShares Core U.S. Aggregate Bond": "AGG",
+    "^DJI - Dow Jones Industrial Average": "^DJI",
+    "^RUT - Russell 2000 Index (Small Cap)": "^RUT",
+    "^MID - S&P MidCap 400 Index": "^MID",
+    "VTI - Vanguard Total Stock Market ETF": "VTI",
+    "AGG - iShares Core U.S. Aggregate Bond ETF": "AGG",
+    "EFA - iShares MSCI EAFE ETF (Developed Markets)": "EFA",
+    "EEM - iShares MSCI Emerging Markets ETF": "EEM",
     "Custom Ticker...": "CUSTOM",
 }
 
 # Sidebar Controls
 st.sidebar.header("1. Investment Selection")
 
-# Fund Dropdown Selection
+# Fund Selection
 selected_fund_label = st.sidebar.selectbox(
     "Select Mutual Fund", list(FUND_OPTIONS.keys())
 )
 if FUND_OPTIONS[selected_fund_label] == "CUSTOM":
     fund_ticker = (
-        st.sidebar.text_input("Enter Fund Ticker", value="VFIAX")
+        st.sidebar.text_input("Enter Custom Fund Ticker", value="VFIAX")
         .strip()
         .upper()
     )
 else:
     fund_ticker = FUND_OPTIONS[selected_fund_label]
 
-# Benchmark Dropdown Selection
+# Benchmark Selection
 selected_bench_label = st.sidebar.selectbox(
     "Select Benchmark Index", list(BENCHMARK_OPTIONS.keys())
 )
 if BENCHMARK_OPTIONS[selected_bench_label] == "CUSTOM":
     benchmark_ticker = (
-        st.sidebar.text_input("Enter Benchmark Ticker", value="^GSPC")
+        st.sidebar.text_input("Enter Custom Benchmark Ticker", value="^GSPC")
         .strip()
         .upper()
     )
@@ -87,7 +104,7 @@ try:
     df = pd.DataFrame({"Fund": fund_data, "Benchmark": bench_data}).dropna()
     returns = df.pct_change().dropna()
 
-    # Core Metrics
+    # Core Metrics Calculation
     trading_days = 252
     fund_cagr = (
         (1 + returns["Fund"]).prod() ** (trading_days / len(returns))
@@ -111,7 +128,7 @@ try:
     col3.metric("Beta (vs Market)", f"{beta:.2f}")
     col4.metric("Worst Drawdown", f"{max_drawdown:.2%}")
 
-    # Tabs Layout
+    # Navigation Tabs
     tab1, tab2, tab3 = st.tabs(
         [
             "📈 Performance & Growth",
