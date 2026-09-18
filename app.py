@@ -11,10 +11,55 @@ st.caption(
     "Institutional-grade portfolio analytics, crisis stress-testing, and forward wealth simulations."
 )
 
+# Pre-configured Ticker Dictionaries
+FUND_OPTIONS = {
+    "VFIAX - Vanguard 500 Index Fund": "VFIAX",
+    "FXAIX - Fidelity 500 Index Fund": "FXAIX",
+    "FBGRX - Fidelity Blue Chip Growth": "FBGRX",
+    "AGTHX - American Funds Growth Fund": "AGTHX",
+    "SGRAX - Allspring Large Cap Core (Wells Fargo)": "SGRAX",
+    "EKJAX - Allspring Discovery Growth (Wells Fargo)": "EKJAX",
+    "VBTLX - Vanguard Total Bond Market": "VBTLX",
+    "Custom Ticker...": "CUSTOM",
+}
+
+BENCHMARK_OPTIONS = {
+    "^GSPC - S&P 500 Index": "^GSPC",
+    "^IXIC - NASDAQ Composite": "^IXIC",
+    "^RUT - Russell 2000 (Small Cap)": "^RUT",
+    "AGG - iShares Core U.S. Aggregate Bond": "AGG",
+    "Custom Ticker...": "CUSTOM",
+}
+
 # Sidebar Controls
-st.sidebar.header("1. Investment Parameters")
-fund_ticker = st.sidebar.text_input("Mutual Fund Ticker", value="VFIAX")
-benchmark_ticker = st.sidebar.text_input("Benchmark Ticker", value="^GSPC")
+st.sidebar.header("1. Investment Selection")
+
+# Fund Dropdown Selection
+selected_fund_label = st.sidebar.selectbox(
+    "Select Mutual Fund", list(FUND_OPTIONS.keys())
+)
+if FUND_OPTIONS[selected_fund_label] == "CUSTOM":
+    fund_ticker = (
+        st.sidebar.text_input("Enter Fund Ticker", value="VFIAX")
+        .strip()
+        .upper()
+    )
+else:
+    fund_ticker = FUND_OPTIONS[selected_fund_label]
+
+# Benchmark Dropdown Selection
+selected_bench_label = st.sidebar.selectbox(
+    "Select Benchmark Index", list(BENCHMARK_OPTIONS.keys())
+)
+if BENCHMARK_OPTIONS[selected_bench_label] == "CUSTOM":
+    benchmark_ticker = (
+        st.sidebar.text_input("Enter Benchmark Ticker", value="^GSPC")
+        .strip()
+        .upper()
+    )
+else:
+    benchmark_ticker = BENCHMARK_OPTIONS[selected_bench_label]
+
 start_date = st.sidebar.date_input(
     "Start Date", value=pd.to_datetime("2020-01-01")
 )
@@ -59,7 +104,7 @@ try:
     drawdown = (cumulative - peak) / peak
     max_drawdown = drawdown.min()
 
-    # KPI Overview
+    # KPI Overview Cards
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Annualized Return", f"{fund_cagr:.2%}")
     col2.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
@@ -93,13 +138,11 @@ try:
         sim_days = sim_years * trading_days
         num_simulations = 1000
 
-        # Run Simulation
         sim_returns = np.random.normal(
             mean_daily, std_daily, (sim_days, num_simulations)
         )
         price_paths = initial_inv * np.cumprod(1 + sim_returns, axis=0)
 
-        # Percentiles
         p10 = np.percentile(price_paths[-1, :], 10)
         p50 = np.percentile(price_paths[-1, :], 50)
         p90 = np.percentile(price_paths[-1, :], 90)
@@ -109,9 +152,8 @@ try:
         scol2.metric("Expected Median (50th Percentile)", f"${p50:,.0f}")
         scol3.metric("Optimistic (90th Percentile)", f"${p90:,.0f}")
 
-        # Plot Simulation Pathways
         fig_sim = go.Figure()
-        for i in range(min(50, num_simulations)):  # Plot first 50 paths
+        for i in range(min(50, num_simulations)):
             fig_sim.add_trace(
                 go.Scatter(
                     y=price_paths[:, i],
@@ -138,12 +180,12 @@ try:
     with tab3:
         st.subheader("Historical Crisis Replay")
         st.write(
-            "Evaluates how the fund performed during key historical market shock periods:"
+            "Evaluates how the selected fund performed during key historical stress periods:"
         )
 
         crises = {
             "2020 COVID Crash (Feb - Mar 2020)": ("2020-02-19", "2020-03-23"),
-            "2022 Rate Hike / Tech Selloff": ("2022-01-03", "2022-10-12"),
+            "2022 Inflation / Rate Hike Selloff": ("2022-01-03", "2022-10-12"),
         }
 
         crisis_results = []
@@ -161,7 +203,7 @@ try:
                         {
                             "Crisis Period": name,
                             f"{fund_ticker} Return": f"{f_return:.2%}",
-                            "Benchmark Return": f"{b_return:.2%}",
+                            f"{benchmark_ticker} Return": f"{b_return:.2%}",
                             "Outperformance": f"{(f_return - b_return):.2%}",
                         }
                     )
