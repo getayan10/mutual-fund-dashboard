@@ -5,84 +5,112 @@ import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 
-st.set_page_config(page_title="Institutional Wealth Dashboard", layout="wide")
+st.set_page_config(
+    page_title="Institutional Wealth Dashboard", layout="wide"
+)
 st.title("💼 Comprehensive Wealth & Risk Analytics Dashboard")
 st.caption(
     "Institutional-grade portfolio analytics, crisis stress-testing, and forward wealth simulations."
 )
 
-# Pre-configured Ticker Dictionaries (20 Mutual Funds & 10 Benchmarks)
-FUND_OPTIONS = {
-    "VFIAX - Vanguard 500 Index Fund": "VFIAX",
-    "FXAIX - Fidelity 500 Index Fund": "FXAIX",
-    "SWPPX - Schwab S&P 500 Index Fund": "SWPPX",
-    "FBGRX - Fidelity Blue Chip Growth": "FBGRX",
-    "AGTHX - American Funds Growth Fund of America": "AGTHX",
-    "VWUAX - Vanguard U.S. Growth Fund": "VWUAX",
-    "DODGX - Dodge & Cox Stock Fund": "DODGX",
-    "VVIAX - Vanguard Value Index Fund": "VVIAX",
-    "AMRMX - American Funds Washington Mutual": "AMRMX",
-    "SGRAX - Allspring Large Cap Core (Wells Fargo)": "SGRAX",
-    "EKJAX - Allspring Discovery Growth (Wells Fargo)": "EKJAX",
-    "NVHAX - Allspring Special Small Cap Value (Wells Fargo)": "NVHAX",
-    "WFDAX - Allspring Core Bond Fund (Wells Fargo)": "WFDAX",
-    "VIMAX - Vanguard Mid-Cap Index Fund": "VIMAX",
-    "VSMAX - Vanguard Small-Cap Index Fund": "VSMAX",
-    "VTIAX - Vanguard Total International Stock Index": "VTIAX",
-    "AEPGX - American Funds EuroPacific Growth": "AEPGX",
-    "VBTLX - Vanguard Total Bond Market Index": "VBTLX",
-    "DODIX - Dodge & Cox Income Fund": "DODIX",
-    "Custom Ticker...": "CUSTOM",
+# Region-Categorized Fund & Benchmark Mapping
+FUNDS_BY_REGION = {
+    "US Market": {
+        "VFIAX - Vanguard 500 Index Fund": "VFIAX",
+        "FXAIX - Fidelity 500 Index Fund": "FXAIX",
+        "SWPPX - Schwab S&P 500 Index Fund": "SWPPX",
+        "FBGRX - Fidelity Blue Chip Growth": "FBGRX",
+        "AGTHX - American Funds Growth Fund of America": "AGTHX",
+        "DODGX - Dodge & Cox Stock Fund": "DODGX",
+        "SGRAX - Allspring Large Cap Core (Wells Fargo)": "SGRAX",
+        "EKJAX - Allspring Discovery Growth (Wells Fargo)": "EKJAX",
+        "NVHAX - Allspring Special Small Cap Value (Wells Fargo)": "NVHAX",
+        "VBTLX - Vanguard Total Bond Market Index": "VBTLX",
+        "Custom Ticker...": "CUSTOM",
+    },
+    "EMEA Market (Europe, Middle East, Africa)": {
+        "0P00000B2H.L - Fidelity European Growth Fund": "0P00000B2H.L",
+        "0P0000XW01.L - Vanguard LifeStrategy 60% Equity": "0P0000XW01.L",
+        "IWDA.L - iShares Core MSCI World UCITS ETF": "IWDA.L",
+        "VEUR.L - Vanguard FTSE Developed Europe UCITS ETF": "VEUR.L",
+        "IEAC.L - iShares Core EUR Corporate Bond UCITS ETF": "IEAC.L",
+        "Custom Ticker...": "CUSTOM",
+    },
+    "Global & Emerging Markets": {
+        "VTIAX - Vanguard Total International Stock Index": "VTIAX",
+        "AEPGX - American Funds EuroPacific Growth": "AEPGX",
+        "VTI - Vanguard Total Stock Market ETF": "VTI",
+        "Custom Ticker...": "CUSTOM",
+    },
 }
 
-BENCHMARK_OPTIONS = {
-    "^GSPC - S&P 500 Index": "^GSPC",
-    "^IXIC - NASDAQ Composite": "^IXIC",
-    "^DJI - Dow Jones Industrial Average": "^DJI",
-    "^RUT - Russell 2000 Index (Small Cap)": "^RUT",
-    "^MID - S&P MidCap 400 Index": "^MID",
-    "VTI - Vanguard Total Stock Market ETF": "VTI",
-    "AGG - iShares Core U.S. Aggregate Bond ETF": "AGG",
-    "EFA - iShares MSCI EAFE ETF (Developed Markets)": "EFA",
-    "EEM - iShares MSCI Emerging Markets ETF": "EEM",
-    "Custom Ticker...": "CUSTOM",
+BENCHMARKS_BY_REGION = {
+    "US Market": {
+        "^GSPC - S&P 500 Index (Broad US Large Cap)": "^GSPC",
+        "^IXIC - NASDAQ Composite (Tech & Growth)": "^IXIC",
+        "^DJI - Dow Jones Industrial Average": "^DJI",
+        "^RUT - Russell 2000 Index (US Small Cap)": "^RUT",
+        "AGG - iShares Core U.S. Aggregate Bond ETF": "AGG",
+        "Custom Ticker...": "CUSTOM",
+    },
+    "EMEA Market (Europe, Middle East, Africa)": {
+        "^GDAXI - DAX 40 Index (Germany Blue-Chip)": "^GDAXI",
+        "^FTSE - FTSE 100 Index (UK)": "^FTSE",
+        "^FCHI - CAC 40 Index (France)": "^FCHI",
+        "FTSEMIB.MI - FTSE MIB Index (Italy)": "FTSEMIB.MI",
+        "^STOXX50E - EURO STOXX 50 Index (Eurozone)": "^STOXX50E",
+        "Custom Ticker...": "CUSTOM",
+    },
+    "Global & Emerging Markets": {
+        "EFA - iShares MSCI EAFE ETF (Developed Ex-US)": "EFA",
+        "EEM - iShares MSCI Emerging Markets ETF": "EEM",
+        "ACWI - iShares MSCI ACWI ETF (All Country World)": "ACWI",
+        "Custom Ticker...": "CUSTOM",
+    },
 }
 
 # Sidebar Controls
-st.sidebar.header("1. Investment Selection")
-
-# Fund Selection
-selected_fund_label = st.sidebar.selectbox(
-    "Select Mutual Fund", list(FUND_OPTIONS.keys())
+st.sidebar.header("1. Geographic Focus")
+selected_region = st.sidebar.selectbox(
+    "Select Region Focus", list(FUNDS_BY_REGION.keys())
 )
-if FUND_OPTIONS[selected_fund_label] == "CUSTOM":
+
+st.sidebar.header("2. Asset Selection")
+
+# Filtered Dropdowns based on Region Choice
+current_funds = FUNDS_BY_REGION[selected_region]
+current_benchmarks = BENCHMARKS_BY_REGION[selected_region]
+
+selected_fund_label = st.sidebar.selectbox(
+    "Select Mutual Fund", list(current_funds.keys())
+)
+if current_funds[selected_fund_label] == "CUSTOM":
     fund_ticker = (
         st.sidebar.text_input("Enter Custom Fund Ticker", value="VFIAX")
         .strip()
         .upper()
     )
 else:
-    fund_ticker = FUND_OPTIONS[selected_fund_label]
+    fund_ticker = current_funds[selected_fund_label]
 
-# Benchmark Selection
 selected_bench_label = st.sidebar.selectbox(
-    "Select Benchmark Index", list(BENCHMARK_OPTIONS.keys())
+    "Select Benchmark Index", list(current_benchmarks.keys())
 )
-if BENCHMARK_OPTIONS[selected_bench_label] == "CUSTOM":
+if current_benchmarks[selected_bench_label] == "CUSTOM":
     benchmark_ticker = (
         st.sidebar.text_input("Enter Custom Benchmark Ticker", value="^GSPC")
         .strip()
         .upper()
     )
 else:
-    benchmark_ticker = BENCHMARK_OPTIONS[selected_bench_label]
+    benchmark_ticker = current_benchmarks[selected_bench_label]
 
 start_date = st.sidebar.date_input(
     "Start Date", value=pd.to_datetime("2020-01-01")
 )
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 
-st.sidebar.header("2. Simulation Settings")
+st.sidebar.header("3. Simulation Settings")
 initial_inv = st.sidebar.number_input(
     "Initial Portfolio Value ($)", value=100000, step=10000
 )
@@ -104,7 +132,7 @@ try:
     df = pd.DataFrame({"Fund": fund_data, "Benchmark": bench_data}).dropna()
     returns = df.pct_change().dropna()
 
-    # Core Metrics Calculation
+    # Core Calculations
     trading_days = 252
     fund_cagr = (
         (1 + returns["Fund"]).prod() ** (trading_days / len(returns))
@@ -121,14 +149,13 @@ try:
     drawdown = (cumulative - peak) / peak
     max_drawdown = drawdown.min()
 
-    # KPI Overview Cards
+    # Metrics Display
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Annualized Return", f"{fund_cagr:.2%}")
     col2.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
-    col3.metric("Beta (vs Market)", f"{beta:.2f}")
+    col3.metric(f"Beta (vs {benchmark_ticker})", f"{beta:.2f}")
     col4.metric("Worst Drawdown", f"{max_drawdown:.2%}")
 
-    # Navigation Tabs
     tab1, tab2, tab3 = st.tabs(
         [
             "📈 Performance & Growth",
@@ -197,7 +224,7 @@ try:
     with tab3:
         st.subheader("Historical Crisis Replay")
         st.write(
-            "Evaluates how the selected fund performed during key historical stress periods:"
+            "Evaluates fund performance during major historical volatility periods:"
         )
 
         crises = {
